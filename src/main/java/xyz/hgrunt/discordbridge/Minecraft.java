@@ -1,11 +1,17 @@
 package xyz.hgrunt.discordbridge;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.security.auth.login.LoginException;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
@@ -24,6 +30,7 @@ import net.dv8tion.jda.api.entities.TextChannel;
 public class Minecraft extends JavaPlugin implements Listener {
 	Discord discord = new Discord();
 	FileConfiguration config = getConfig();
+	HashMap<String, String> lang = new HashMap<String, String>();
 	TextChannel ch;
 
 	Pattern emojiPattern = Pattern.compile(":(\\w+):");
@@ -32,6 +39,15 @@ public class Minecraft extends JavaPlugin implements Listener {
 	public void onEnable() {
 		config.options().copyDefaults(true);
 		saveConfig();
+
+		try {
+			loadAdvancements();
+		} catch (IOException e) {
+			getLogger().severe("Failed to read Minecraft's lang file");
+			e.printStackTrace();
+			getPluginLoader().disablePlugin(this);
+			return;
+		}
 
 		String token = config.getString("token");
 
@@ -143,10 +159,35 @@ public class Minecraft extends JavaPlugin implements Listener {
 			return;
 		}
 
-		if (e.getAdvancement().getKey().getKey().startsWith("recipes/"))
+		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
+				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
 			return;
 
 		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement "
-				+ e.getAdvancement().getKey().getKey()).queue();
+				+ lang.get(e.getAdvancement().getKey().getKey())).queue();
+	}
+
+	private void loadAdvancements() throws IOException {
+		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_us.lang");
+		BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+
+		String line;
+		while ((line = reader.readLine()) != null) {
+			if (!line.startsWith("advancements.") || !line.contains(".title="))
+				continue;
+
+			if (line.contains("root.title="))
+				continue;
+
+			String key = line.split("=")[0].replace("advancements.", "").replace(".title", "").replace(".", "/");
+			String value = line.split("=")[1];
+
+			if (key.equals("husbandry/breed_all_animals"))
+				key = "husbandry/bred_all_animals"; // why
+			lang.put(key, value);
+		}
+
+		reader.close();
+		is.close();
 	}
 }
