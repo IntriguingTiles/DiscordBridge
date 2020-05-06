@@ -26,6 +26,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
+import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
 public class Minecraft extends JavaPlugin implements Listener {
 	Discord discord = new Discord();
@@ -76,6 +77,11 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 	@EventHandler
 	public void onPlayerChat(AsyncPlayerChatEvent e) {
+		if (getServer().getPluginManager().getPlugin("FactionChat") != null) {
+			if (FactionChatAPI.isFactionChatMessage(e))
+				return;
+		}
+
 		if (ch == null) {
 			String id = config.getString("channel");
 			ch = discord.jda.getTextChannelById(id);

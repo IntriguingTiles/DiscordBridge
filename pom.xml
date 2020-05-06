@@ -26,6 +26,11 @@
 			<name>jcenter-bintray</name>
 			<url>https://jcenter.bintray.com</url>
 		</repository>
+
+		<repository>
+			<id>FactionChat-repo</id>
+			<url>https://hgrunt.xyz/maven/</url>
+		</repository>
 	</repositories>
 
 	<dependencies>
@@ -53,13 +58,28 @@
 			<artifactId>log4j-slf4j-impl</artifactId>
 			<version>2.13.2</version>
 		</dependency>
+
+		<dependency>
+			<groupId>nz.co.lolnet.james137137</groupId>
+			<artifactId>factionchat</artifactId>
+			<version>1.10.8</version>
+		</dependency>
 	</dependencies>
+
 	<build>
+		<finalName>${project.name}</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
 				<version>3.2.1</version>
+				<configuration>
+					<artifactSet>
+						<excludes>
+							<exclude>nz.co.lolnet.james137137:factionchat</exclude>
+						</excludes>
+					</artifactSet>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
