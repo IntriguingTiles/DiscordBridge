@@ -62,8 +62,11 @@ public class Discord extends ListenerAdapter {
 			attch += "[" + e.getMessage().getAttachments().size() + " attachment(s)]";
 		}
 
-		minecraft.getServer().broadcastMessage("<" + ChatColor.stripColor(e.getAuthor().getName()) + "#"
-				+ e.getAuthor().getDiscriminator() + "> " + e.getMessage().getContentDisplay() + attch);
+		minecraft.getServer()
+				.broadcastMessage("<"
+						+ ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"))
+						+ (ChatColor.stripColor(e.getAuthor().getName())) + "#" + e.getAuthor().getDiscriminator()
+						+ ChatColor.RESET + "> " + e.getMessage().getContentDisplay() + attch);
 	}
 
 	public static String escapeMarkdown(String text) {
