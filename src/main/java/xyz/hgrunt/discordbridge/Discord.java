@@ -27,7 +27,7 @@ public class Discord extends ListenerAdapter {
 
 	public void init(String token, Minecraft minecraft) throws LoginException, InterruptedException {
 		jda = JDABuilder.createDefault(token).addEventListeners(new Discord(minecraft))
-				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().size() + "/"
+				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().length + "/"
 						+ minecraft.getServer().getMaxPlayers() + " players online"))
 				.build();
 	}
@@ -43,7 +43,7 @@ public class Discord extends ListenerAdapter {
 			return;
 
 		if (e.getMessage().getContentRaw().equalsIgnoreCase("!list")) {
-			String msg = "There are " + minecraft.getServer().getOnlinePlayers().size() + "/"
+			String msg = "There are " + minecraft.getServer().getOnlinePlayers().length + "/"
 					+ minecraft.getServer().getMaxPlayers() + " players online:\n";
 
 			for (Player p : minecraft.getServer().getOnlinePlayers()) {
@@ -63,10 +63,9 @@ public class Discord extends ListenerAdapter {
 		}
 
 		minecraft.getServer()
-				.broadcastMessage("<"
-						+ ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"))
+				.broadcastMessage("<" + ChatColor.valueOf(minecraft.config.getString("username-color").toUpperCase())
 						+ (ChatColor.stripColor(e.getAuthor().getName())) + "#" + e.getAuthor().getDiscriminator()
-						+ ChatColor.RESET + "> " + e.getMessage().getContentDisplay() + attch);
+						+ ChatColor.WHITE + ChatColor.stripColor("> " + e.getMessage().getContentDisplay() + attch));
 	}
 
 	public static String escapeMarkdown(String text) {

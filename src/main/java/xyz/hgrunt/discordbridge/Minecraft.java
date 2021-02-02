@@ -1,10 +1,5 @@
 package xyz.hgrunt.discordbridge;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,47 +8,39 @@ import javax.security.auth.login.LoginException;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.event.EventHandler;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerAdvancementDoneEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityListener;
+import org.bukkit.event.player.PlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerListener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.config.Configuration;
 
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
-import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
 public class Minecraft extends JavaPlugin implements Listener {
 	Discord discord = new Discord();
-	FileConfiguration config = getConfig();
-	HashMap<String, String> lang = new HashMap<String, String>();
+	Configuration config;
 	TextChannel ch;
 
 	Pattern emojiPattern = Pattern.compile(":(\\w+):");
 
 	@Override
 	public void onEnable() {
-		config.options().copyDefaults(true);
-		saveConfig();
-
-		try {
-			loadAdvancements();
-		} catch (IOException e) {
-			getLogger().severe("Failed to read Minecraft's lang file");
-			e.printStackTrace();
-			getPluginLoader().disablePlugin(this);
-			return;
-		}
-
-		String token = config.getString("token");
+		config = getConfiguration();
+		String token = config.getString("token", "insert-bot-token-here");
+		config.getString("channel", "insert-channel-id-here");
+		config.getString("username-color", "WHITE");
+		config.save();
 
 		if (token.equals("insert-bot-token-here")) {
-			getLogger().severe("Please set up your config.");
+			Bukkit.getLogger().severe("Please set up your config.");
 			getPluginLoader().disablePlugin(this);
 			return;
 		}
@@ -61,12 +48,15 @@ public class Minecraft extends JavaPlugin implements Listener {
 		try {
 			discord.init(token, this);
 		} catch (LoginException | InterruptedException e) {
-			getLogger().severe("Failed to init Discord! Is your token correct?");
+			Bukkit.getLogger().severe("Failed to init Discord! Is your token correct?");
 			getPluginLoader().disablePlugin(this);
 			return;
 		}
 
-		getServer().getPluginManager().registerEvents(this, this);
+		getServer().getPluginManager().registerEvent(Event.Type.PLAYER_CHAT, new PlayerEvents(), Event.Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Event.Type.PLAYER_JOIN, new PlayerEvents(), Event.Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Event.Type.PLAYER_QUIT, new PlayerEvents(), Event.Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Event.Type.ENTITY_DEATH, new EntityEvents(), Event.Priority.Normal, this);
 	}
 
 	@Override
@@ -75,125 +65,80 @@ public class Minecraft extends JavaPlugin implements Listener {
 			discord.jda.shutdownNow();
 	}
 
-	@EventHandler
-	public void onPlayerChat(AsyncPlayerChatEvent e) {
-		if (getServer().getPluginManager().getPlugin("FactionChat") != null) {
-			if (FactionChatAPI.isFactionChatMessage(e))
+	public class PlayerEvents extends PlayerListener {
+		public void onPlayerChat(PlayerChatEvent e) {
+			if (ch == null) {
+				String id = config.getString("channel");
+				ch = discord.jda.getTextChannelById(id);
+			}
+
+			if (ch == null) {
+				Bukkit.getLogger().severe("Couldn't find the channel!");
 				return;
-		}
+			}
 
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
+			String msg = e.getMessage();
+			Matcher match = emojiPattern.matcher(msg);
+			if (match.find()) {
+				List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
+				if (!emotes.isEmpty()) {
+					msg = msg.replace(":" + match.group(1) + ":", emotes.get(0).getAsMention());
+				}
+			}
 
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
-			return;
+			ch.sendMessage("**<" + Discord.escapeMarkdown(e.getPlayer().getDisplayName()) + ">** " + msg).queue();
 		}
+		
+		public void onPlayerJoin(PlayerJoinEvent e) {
+			if (ch == null) {
+				String id = config.getString("channel");
+				ch = discord.jda.getTextChannelById(id);
+			}
+			
+			if (ch == null) {
+				Bukkit.getLogger().severe("Couldn't find the channel!");
+				return;
+			}
+			
+			ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getJoinMessage()))).queue();
+			discord.jda.getPresence().setActivity(Activity.playing(
+					Bukkit.getServer().getOnlinePlayers().length + "/" + getServer().getMaxPlayers() + " players online"));
+		}
+		
+		public void onPlayerQuit(PlayerQuitEvent e) {
+			if (ch == null) {
+				String id = config.getString("channel");
+				ch = discord.jda.getTextChannelById(id);
+			}
+			
+			if (ch == null) {
+				Bukkit.getLogger().severe("Couldn't find the channel!");
+				return;
+			}
+			
+			ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getQuitMessage()))).queue();
+			discord.jda.getPresence().setActivity(Activity.playing(Bukkit.getServer().getOnlinePlayers().length - 1 + "/"
+					+ getServer().getMaxPlayers() + " players online"));
+		}
+	}
 
-		String msg = e.getMessage();
-		Matcher match = emojiPattern.matcher(msg);
-		if (match.find()) {
-			List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
-			if (!emotes.isEmpty()) {
-				msg = msg.replace(":" + match.group(1) + ":", emotes.get(0).getAsMention());
+	public class EntityEvents extends EntityListener {
+		public void onEntityDeath(EntityDeathEvent e) {
+			if (e.getEntity() instanceof Player) {
+				Player p = (Player) e.getEntity();
+				
+				if (ch == null) {
+					String id = config.getString("channel");
+					ch = discord.jda.getTextChannelById(id);
+				}
+				
+				if (ch == null) {
+					Bukkit.getLogger().severe("Couldn't find the channel!");
+					return;
+				}
+				
+				ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(p.getDisplayName()) + " died")).queue();
 			}
 		}
-
-		ch.sendMessage("**<" + Discord.escapeMarkdown(e.getPlayer().getDisplayName()) + ">** " + msg).queue();
-	}
-
-	@EventHandler
-	public void onPlayerJoin(PlayerJoinEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
-			return;
-		}
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getJoinMessage()))).queue();
-		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() + "/" + getServer().getMaxPlayers() + " players online"));
-	}
-
-	@EventHandler
-	public void onPlayerLeave(PlayerQuitEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
-			return;
-		}
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getQuitMessage()))).queue();
-		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() - 1 + "/" + getServer().getMaxPlayers() + " players online"));
-	}
-
-	@EventHandler
-	public void onPlayerDeath(PlayerDeathEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
-			return;
-		}
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getDeathMessage()))).queue();
-	}
-
-	@EventHandler
-	public void onPlayerAdvancement(PlayerAdvancementDoneEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
-			return;
-		}
-
-		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
-				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
-			return;
-
-		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement "
-				+ lang.get(e.getAdvancement().getKey().getKey())).queue();
-	}
-
-	private void loadAdvancements() throws IOException {
-		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_us.lang");
-		BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-
-		String line;
-		while ((line = reader.readLine()) != null) {
-			if (!line.startsWith("advancements.") || !line.contains(".title="))
-				continue;
-
-			if (line.contains("root.title="))
-				continue;
-
-			String key = line.split("=")[0].replace("advancements.", "").replace(".title", "").replace(".", "/");
-			String value = line.split("=")[1];
-
-			if (key.equals("husbandry/breed_all_animals"))
-				key = "husbandry/bred_all_animals"; // why
-			lang.put(key, value);
-		}
-
-		reader.close();
-		is.close();
 	}
 }
