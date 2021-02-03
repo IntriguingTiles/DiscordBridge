@@ -5,3 +5,8 @@ author: IntriguingTiles
 website: https://github.com/IntriguingTiles/DiscordBridge
 softdepend: [FactionChat]
 main: xyz.hgrunt.discordbridge.Minecraft
+
+commands:
+   discordbridge:
+      description: Reloads the config
+      permission: discordbridge.reload

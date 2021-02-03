@@ -13,6 +13,9 @@ import javax.security.auth.login.LoginException;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -28,7 +31,7 @@ import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
 import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
-public class Minecraft extends JavaPlugin implements Listener {
+public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 	private Discord discord = null;
 	FileConfiguration config = getConfig();
 	private HashMap<String, String> lang = new HashMap<String, String>();
@@ -67,6 +70,7 @@ public class Minecraft extends JavaPlugin implements Listener {
 		}
 
 		getServer().getPluginManager().registerEvents(this, this);
+		getCommand("discordbridge").setExecutor(this);
 	}
 
 	@Override
@@ -133,6 +137,27 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement "
 				+ lang.get(e.getAdvancement().getKey().getKey())).queue();
+	}
+
+	@Override
+	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+		reloadConfig();
+		config = getConfig();
+
+		if (discord != null && discord.jda != null)
+			discord.jda.shutdownNow();
+
+		try {
+			discord = new Discord(this, config.getString("token"));
+		} catch (LoginException e) {
+			getLogger().severe("Failed to init Discord! Is your token correct?");
+			getPluginLoader().disablePlugin(this);
+		}
+
+		getLogger().info("Reloaded.");
+		sender.sendMessage("Reloaded.");
+
+		return true;
 	}
 
 	private boolean ensureChannel() {
