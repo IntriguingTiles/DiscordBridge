@@ -29,10 +29,10 @@ import net.dv8tion.jda.api.entities.TextChannel;
 import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
 public class Minecraft extends JavaPlugin implements Listener {
-	Discord discord = new Discord();
+	private Discord discord = null;
 	FileConfiguration config = getConfig();
-	HashMap<String, String> lang = new HashMap<String, String>();
-	TextChannel ch;
+	private HashMap<String, String> lang = new HashMap<String, String>();
+	private TextChannel ch;
 
 	Pattern emojiPattern = Pattern.compile(":(\\w+):");
 
@@ -59,8 +59,8 @@ public class Minecraft extends JavaPlugin implements Listener {
 		}
 
 		try {
-			discord.init(token, this);
-		} catch (LoginException | InterruptedException e) {
+			discord = new Discord(this, token);
+		} catch (LoginException e) {
 			getLogger().severe("Failed to init Discord! Is your token correct?");
 			getPluginLoader().disablePlugin(this);
 			return;
@@ -71,7 +71,7 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 	@Override
 	public void onDisable() {
-		if (discord.jda != null)
+		if (discord != null && discord.jda != null)
 			discord.jda.shutdownNow();
 	}
 
@@ -82,15 +82,8 @@ public class Minecraft extends JavaPlugin implements Listener {
 				return;
 		}
 
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+		if (!ensureChannel())
 			return;
-		}
 
 		String msg = e.getMessage();
 		Matcher match = emojiPattern.matcher(msg);
@@ -106,16 +99,8 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+		if (!ensureChannel())
 			return;
-		}
-
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getJoinMessage()))).queue();
 		discord.jda.getPresence().setActivity(Activity.playing(
 				getServer().getOnlinePlayers().size() + "/" + getServer().getMaxPlayers() + " players online"));
@@ -123,16 +108,8 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 	@EventHandler
 	public void onPlayerLeave(PlayerQuitEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+		if (!ensureChannel())
 			return;
-		}
-
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getQuitMessage()))).queue();
 		discord.jda.getPresence().setActivity(Activity.playing(
 				getServer().getOnlinePlayers().size() - 1 + "/" + getServer().getMaxPlayers() + " players online"));
@@ -140,30 +117,15 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 	@EventHandler
 	public void onPlayerDeath(PlayerDeathEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+		if (!ensureChannel())
 			return;
-		}
-
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getDeathMessage()))).queue();
 	}
 
 	@EventHandler
 	public void onPlayerAdvancement(PlayerAdvancementDoneEvent e) {
-		if (ch == null) {
-			String id = config.getString("channel");
-			ch = discord.jda.getTextChannelById(id);
-		}
-
-		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+		if (!ensureChannel())
 			return;
-		}
 
 		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
 				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
@@ -171,6 +133,25 @@ public class Minecraft extends JavaPlugin implements Listener {
 
 		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement "
 				+ lang.get(e.getAdvancement().getKey().getKey())).queue();
+	}
+
+	private boolean ensureChannel() {
+		if (ch == null) {
+			String id = config.getString("channel");
+			ch = discord.jda.getTextChannelById(id);
+		}
+
+		if (ch == null) {
+			getLogger().severe("Couldn't find the channel!");
+			return false;
+		}
+
+		if (!ch.canTalk()) {
+			getLogger().severe("I don't have permission to talk in #" + ch.getName() + "!");
+			return false;
+		}
+
+		return true;
 	}
 
 	private void loadAdvancements() throws IOException {

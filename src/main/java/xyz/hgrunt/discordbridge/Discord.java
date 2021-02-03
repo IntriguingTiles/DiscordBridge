@@ -1,5 +1,7 @@
 package xyz.hgrunt.discordbridge;
 
+import java.awt.Color;
+
 import javax.security.auth.login.LoginException;
 
 import org.bukkit.ChatColor;
@@ -14,19 +16,13 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 public class Discord extends ListenerAdapter {
 	JDA jda;
-	Minecraft minecraft;
-	String chId;
+	private Minecraft minecraft;
+	private String chId;
 
-	public Discord() {
-	}
-
-	public Discord(Minecraft minecraft) {
+	public Discord(Minecraft minecraft, String token) throws LoginException {
 		this.minecraft = minecraft;
 		chId = minecraft.config.getString("channel");
-	}
-
-	public void init(String token, Minecraft minecraft) throws LoginException, InterruptedException {
-		jda = JDABuilder.createDefault(token).addEventListeners(new Discord(minecraft))
+		jda = JDABuilder.createDefault(token).addEventListeners(this)
 				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().size() + "/"
 						+ minecraft.getServer().getMaxPlayers() + " players online"))
 				.build();
@@ -34,12 +30,7 @@ public class Discord extends ListenerAdapter {
 
 	@Override
 	public void onMessageReceived(MessageReceivedEvent e) {
-		if (e.getAuthor().isBot())
-			return;
-		if (!((TextChannel) e.getChannel()).canTalk())
-			return;
-
-		if (!e.getChannel().getId().equals(chId))
+		if (!e.getChannel().getId().equals(chId) || e.getAuthor().isBot() || !((TextChannel) e.getChannel()).canTalk())
 			return;
 
 		if (e.getMessage().getContentRaw().equalsIgnoreCase("!list")) {
@@ -62,11 +53,12 @@ public class Discord extends ListenerAdapter {
 			attch += "[" + e.getMessage().getAttachments().size() + " attachment(s)]";
 		}
 
+		String color = ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"));
+
 		minecraft.getServer()
-				.broadcastMessage("<"
-						+ ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"))
-						+ (ChatColor.stripColor(e.getAuthor().getName())) + "#" + e.getAuthor().getDiscriminator()
-						+ ChatColor.RESET + "> " + e.getMessage().getContentDisplay() + attch);
+				.broadcastMessage("<" + color + (ChatColor.stripColor(e.getAuthor().getName())) + "#"
+						+ e.getAuthor().getDiscriminator() + ChatColor.RESET + "> " + e.getMessage().getContentDisplay()
+						+ attch);
 	}
 
 	public static String escapeMarkdown(String text) {
