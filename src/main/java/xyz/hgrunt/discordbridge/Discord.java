@@ -79,11 +79,12 @@ public class Discord extends ListenerAdapter {
 
 		for (int i = 0; i < colors.length; i++) {
 			Color color = colors[i];
-			double d = Math.pow((c.getRed() - color.getRed()) * 0.3, 2)
-					+ Math.pow((c.getGreen() - color.getGreen()) * 0.59, 2)
-					+ Math.pow((c.getBlue() - color.getBlue()) * 0.11, 2);
+			double d = Math.pow((c.getRed() - color.getRed()), 2) + Math.pow((c.getGreen() - color.getGreen()), 2)
+					+ Math.pow((c.getBlue() - color.getBlue()), 2);
 
 			if (d < min) {
+				if (i == 7 || i == 8 && min - d < 3000)
+					continue;
 				min = d;
 				minIndex = i;
 			}
