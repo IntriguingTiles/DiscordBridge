@@ -19,6 +19,12 @@ public class Discord extends ListenerAdapter {
 	private Minecraft minecraft;
 	private String chId;
 
+	// is there any better way to do this?
+	private Color[] colors = { new Color(0x0), new Color(0xAA), new Color(0xAA00), new Color(0xAAAA),
+			new Color(0xAA0000), new Color(0xAA00AA), new Color(0xFFAA00), new Color(0xAAAAAA), new Color(0x555555),
+			new Color(0x5555FF), new Color(0x55FF55), new Color(0x55FFFF), new Color(0xFF5555), new Color(0xFF55FF),
+			new Color(0xFFFF55), new Color(0xFFFFFF) };
+
 	public Discord(Minecraft minecraft, String token) throws LoginException {
 		this.minecraft = minecraft;
 		chId = minecraft.config.getString("channel");
@@ -53,12 +59,37 @@ public class Discord extends ListenerAdapter {
 			attch += "[" + e.getMessage().getAttachments().size() + " attachment(s)]";
 		}
 
-		String color = ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"));
+		String color = null;
+
+		if (minecraft.config.getBoolean("use-role-color-as-username-color") && e.getMember().getColor() != null) {
+			color = getClosestColor(e.getMember().getColor());
+		} else {
+			color = ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"));
+		}
 
 		minecraft.getServer()
 				.broadcastMessage("<" + color + (ChatColor.stripColor(e.getAuthor().getName())) + "#"
 						+ e.getAuthor().getDiscriminator() + ChatColor.RESET + "> " + e.getMessage().getContentDisplay()
 						+ attch);
+	}
+
+	private String getClosestColor(Color c) {
+		double min = Double.MAX_VALUE;
+		int minIndex = -1;
+
+		for (int i = 0; i < colors.length; i++) {
+			Color color = colors[i];
+			double d = Math.pow((c.getRed() - color.getRed()) * 0.3, 2)
+					+ Math.pow((c.getGreen() - color.getGreen()) * 0.59, 2)
+					+ Math.pow((c.getBlue() - color.getBlue()) * 0.11, 2);
+
+			if (d < min) {
+				min = d;
+				minIndex = i;
+			}
+		}
+
+		return ChatColor.getByChar(String.format("%x", minIndex)).toString();
 	}
 
 	public static String escapeMarkdown(String text) {

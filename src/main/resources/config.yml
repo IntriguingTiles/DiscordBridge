@@ -1,3 +1,4 @@
 token: insert-bot-token-here
 channel: insert-channel-id-here
 username-color: '&f'
+use-role-color-as-username-color: false
