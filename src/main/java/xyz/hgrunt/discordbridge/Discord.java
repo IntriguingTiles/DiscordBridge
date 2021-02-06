@@ -83,7 +83,7 @@ public class Discord extends ListenerAdapter {
 					+ Math.pow((c.getBlue() - color.getBlue()), 2);
 
 			if (d < min) {
-				if (i == 7 || i == 8 && min - d < 3000)
+				if (i == 7 || i == 8 && min - d < 3000 || i == 15 && (c.getRed() != 0xFF || c.getGreen() != 0xFF || c.getBlue() != 0xFF))
 					continue;
 				min = d;
 				minIndex = i;
