@@ -135,8 +135,8 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
 			return;
 
-		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement "
-				+ lang.get(e.getAdvancement().getKey().getKey())).queue();
+		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement **"
+				+ lang.get(e.getAdvancement().getKey().getKey()) + "**").queue();
 	}
 
 	@Override
