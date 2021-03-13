@@ -98,7 +98,7 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 			}
 		}
 
-		ch.sendMessage("**<" + Discord.escapeMarkdown(e.getPlayer().getDisplayName()) + ">** " + msg).queue();
+		ch.sendMessage("**<" + Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getDisplayName())) + ">** " + msg).queue();
 	}
 
 	@EventHandler
@@ -135,7 +135,7 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
 			return;
 
-		ch.sendMessage(Discord.escapeMarkdown(e.getPlayer().getName()) + " has made the advancement **"
+		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getName())) + " has made the advancement **"
 				+ lang.get(e.getAdvancement().getKey().getKey()) + "**").queue();
 	}
 
