@@ -29,7 +29,7 @@ public class Discord extends ListenerAdapter {
 		this.minecraft = minecraft;
 		chId = minecraft.config.getString("channel");
 		jda = JDABuilder.createDefault(token).addEventListeners(this)
-				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().size() + "/"
+				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().length + "/"
 						+ minecraft.getServer().getMaxPlayers() + " players online"))
 				.build();
 	}
@@ -40,7 +40,7 @@ public class Discord extends ListenerAdapter {
 			return;
 
 		if (e.getMessage().getContentRaw().equalsIgnoreCase("!list")) {
-			String msg = "There are " + minecraft.getServer().getOnlinePlayers().size() + "/"
+			String msg = "There are " + minecraft.getServer().getOnlinePlayers().length + "/"
 					+ minecraft.getServer().getMaxPlayers() + " players online:\n";
 
 			for (Player p : minecraft.getServer().getOnlinePlayers()) {
@@ -64,12 +64,12 @@ public class Discord extends ListenerAdapter {
 		if (minecraft.config.getBoolean("use-role-color-as-username-color") && e.getMember().getColor() != null) {
 			color = getClosestColor(e.getMember().getColor());
 		} else {
-			color = ChatColor.translateAlternateColorCodes('&', minecraft.config.getString("username-color"));
+			color = ChatColor.getByCode(Integer.parseInt(minecraft.config.getString("username-color").replace("&", ""), 16)).toString();
 		}
 
 		minecraft.getServer()
 				.broadcastMessage("<" + color + (ChatColor.stripColor(e.getAuthor().getName())) + "#"
-						+ e.getAuthor().getDiscriminator() + ChatColor.RESET + "> " + e.getMessage().getContentDisplay()
+						+ e.getAuthor().getDiscriminator() + ChatColor.WHITE + "> " + e.getMessage().getContentDisplay()
 						+ attch);
 	}
 
@@ -90,7 +90,7 @@ public class Discord extends ListenerAdapter {
 			}
 		}
 
-		return ChatColor.getByChar(String.format("%x", minIndex)).toString();
+		return ChatColor.getByCode(minIndex).toString();
 	}
 
 	public static String escapeMarkdown(String text) {
