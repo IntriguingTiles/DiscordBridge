@@ -29,7 +29,7 @@ public class Discord extends ListenerAdapter {
 		this.minecraft = minecraft;
 		chId = minecraft.config.getString("channel");
 		jda = JDABuilder.createDefault(token).addEventListeners(this)
-				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().size() + "/"
+				.setActivity(Activity.playing(minecraft.getServer().getOnlinePlayers().length + "/"
 						+ minecraft.getServer().getMaxPlayers() + " players online"))
 				.build();
 	}
@@ -40,7 +40,7 @@ public class Discord extends ListenerAdapter {
 			return;
 
 		if (e.getMessage().getContentRaw().equalsIgnoreCase("!list")) {
-			String msg = "There are " + minecraft.getServer().getOnlinePlayers().size() + "/"
+			String msg = "There are " + minecraft.getServer().getOnlinePlayers().length + "/"
 					+ minecraft.getServer().getMaxPlayers() + " players online:\n";
 
 			for (Player p : minecraft.getServer().getOnlinePlayers()) {

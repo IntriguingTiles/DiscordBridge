@@ -1,9 +1,8 @@
 name: DiscordBridge
-version: 0.0.4
+version: 0.0.5
 description: Bridges the gap between Discord and Minecraft
 author: IntriguingTiles
 website: https://github.com/IntriguingTiles/DiscordBridge
-softdepend: [FactionChat]
 main: xyz.hgrunt.discordbridge.Minecraft
 
 commands:

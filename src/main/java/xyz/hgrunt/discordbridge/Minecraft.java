@@ -1,17 +1,11 @@
 package xyz.hgrunt.discordbridge;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.security.auth.login.LoginException;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -21,7 +15,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,29 +22,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
-import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
 public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 	private Discord discord = null;
-	FileConfiguration config = getConfig();
-	private HashMap<String, String> lang = new HashMap<String, String>();
+	FileConfiguration config;
 	private TextChannel ch;
 
 	Pattern emojiPattern = Pattern.compile(":(\\w+):");
 
 	@Override
 	public void onEnable() {
+		config = getConfig();
 		config.options().copyDefaults(true);
 		saveConfig();
-
-		try {
-			loadAdvancements();
-		} catch (IOException e) {
-			getLogger().severe("Failed to read Minecraft's lang file");
-			e.printStackTrace();
-			getPluginLoader().disablePlugin(this);
-			return;
-		}
 
 		String token = config.getString("token");
 
@@ -81,11 +64,6 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 
 	@EventHandler
 	public void onPlayerChat(AsyncPlayerChatEvent e) {
-		if (getServer().getPluginManager().getPlugin("FactionChat") != null) {
-			if (FactionChatAPI.isFactionChatMessage(e))
-				return;
-		}
-
 		if (!ensureChannel())
 			return;
 
@@ -107,7 +85,7 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 			return;
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getJoinMessage()))).queue();
 		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() + "/" + getServer().getMaxPlayers() + " players online"));
+				getServer().getOnlinePlayers().length + "/" + getServer().getMaxPlayers() + " players online"));
 	}
 
 	@EventHandler
@@ -116,7 +94,7 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 			return;
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getQuitMessage()))).queue();
 		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() - 1 + "/" + getServer().getMaxPlayers() + " players online"));
+				getServer().getOnlinePlayers().length - 1 + "/" + getServer().getMaxPlayers() + " players online"));
 	}
 
 	@EventHandler
@@ -124,19 +102,6 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		if (!ensureChannel())
 			return;
 		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getDeathMessage()))).queue();
-	}
-
-	@EventHandler
-	public void onPlayerAdvancement(PlayerAdvancementDoneEvent e) {
-		if (!ensureChannel())
-			return;
-
-		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
-				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
-			return;
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getName())) + " has made the advancement **"
-				+ lang.get(e.getAdvancement().getKey().getKey()) + "**").queue();
 	}
 
 	@Override
@@ -177,29 +142,5 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		}
 
 		return true;
-	}
-
-	private void loadAdvancements() throws IOException {
-		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_us.lang");
-		BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-
-		String line;
-		while ((line = reader.readLine()) != null) {
-			if (!line.startsWith("advancements.") || !line.contains(".title="))
-				continue;
-
-			if (line.contains("root.title="))
-				continue;
-
-			String key = line.split("=")[0].replace("advancements.", "").replace(".title", "").replace(".", "/");
-			String value = line.split("=")[1];
-
-			if (key.equals("husbandry/breed_all_animals"))
-				key = "husbandry/bred_all_animals"; // why
-			lang.put(key, value);
-		}
-
-		reader.close();
-		is.close();
 	}
 }
