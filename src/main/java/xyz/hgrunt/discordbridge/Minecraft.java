@@ -21,7 +21,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerAdvancementDoneEvent;
+import org.bukkit.event.player.PlayerAchievementAwardedEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,7 +29,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
-import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
 public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 	private Discord discord = null;
@@ -45,8 +44,8 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		saveConfig();
 
 		try {
-			loadAdvancements();
-		} catch (IOException e) {
+			loadAchievements();
+		} catch (Exception e) {
 			getLogger().severe("Failed to read Minecraft's lang file");
 			e.printStackTrace();
 			getPluginLoader().disablePlugin(this);
@@ -81,11 +80,6 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 
 	@EventHandler
 	public void onPlayerChat(AsyncPlayerChatEvent e) {
-		if (getServer().getPluginManager().getPlugin("FactionChat") != null) {
-			if (FactionChatAPI.isFactionChatMessage(e))
-				return;
-		}
-
 		if (!ensureChannel())
 			return;
 
@@ -98,7 +92,9 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 			}
 		}
 
-		ch.sendMessage("**<" + Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getDisplayName())) + ">** " + msg).queue();
+		ch.sendMessage(
+				"**<" + Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getDisplayName())) + ">** " + msg)
+				.queue();
 	}
 
 	@EventHandler
@@ -127,16 +123,14 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 	}
 
 	@EventHandler
-	public void onPlayerAdvancement(PlayerAdvancementDoneEvent e) {
+	public void onPlayerAchievement(PlayerAchievementAwardedEvent e) {
 		if (!ensureChannel())
 			return;
 
-		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
-				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
-			return;
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getName())) + " has made the advancement **"
-				+ lang.get(e.getAdvancement().getKey().getKey()) + "**").queue();
+		if (lang.containsKey(e.getAchievement().toString())) {
+			ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getName()))
+					+ " has just earned the achievement **" + lang.get(e.getAchievement().toString()) + "**").queue();
+		}
 	}
 
 	@Override
@@ -179,23 +173,53 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		return true;
 	}
 
-	private void loadAdvancements() throws IOException {
-		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_us.lang");
+	private void loadAchievements() throws IOException {
+		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_US.lang");
 		BufferedReader reader = new BufferedReader(new InputStreamReader(is));
 
 		String line;
 		while ((line = reader.readLine()) != null) {
-			if (!line.startsWith("advancements.") || !line.contains(".title="))
+			if (!line.startsWith("achievement.") || line.contains(".desc="))
 				continue;
 
-			if (line.contains("root.title="))
-				continue;
-
-			String key = line.split("=")[0].replace("advancements.", "").replace(".title", "").replace(".", "/");
+			String oldKey = line.split("=")[0].replace("achievement.", "");
+			String key = "";
 			String value = line.split("=")[1];
 
-			if (key.equals("husbandry/breed_all_animals"))
-				key = "husbandry/bred_all_animals"; // why
+			for (int i = 0; i < oldKey.length(); i++) {
+				if (Character.isUpperCase(oldKey.charAt(i)))
+					key += "_";
+				key += Character.toUpperCase(oldKey.charAt(i));
+			}
+
+			// some of these don't match up, fix them before adding them to the map
+			switch (key) {
+			case "BUILD_WORK_BENCH":
+				key = "BUILD_WORKBENCH";
+				break;
+			case "DIAMONDS":
+				key = "GET_DIAMONDS";
+				break;
+			case "PORTAL":
+				key = "NETHER_PORTAL";
+				break;
+			case "GHAST":
+				key = "GHAST_RETURN";
+				break;
+			case "BLAZE_ROD":
+				key = "GET_BLAZE_ROD";
+				break;
+			case "POTION":
+				key = "BREW_POTION";
+				break;
+			case "THE_END":
+				key = "END_PORTAL";
+				break;
+			case "THE_END2":
+				key = "THE_END";
+				break;
+			}
+
 			lang.put(key, value);
 		}
 

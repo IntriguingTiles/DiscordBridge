@@ -20,16 +20,12 @@
 			<name>m2-dv8tion</name>
 			<url>https://m2.dv8tion.net/releases</url>
 		</repository>
-		<repository>
-			<id>FactionChat-repo</id>
-			<url>https://hgrunt.xyz/maven/</url>
-		</repository>
 	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>org.spigotmc</groupId>
 			<artifactId>spigot-api</artifactId>
-			<version>1.12.2-R0.1-SNAPSHOT</version>
+			<version>1.8.8-R0.1-SNAPSHOT</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -48,11 +44,6 @@
 			<artifactId>log4j-slf4j-impl</artifactId>
 			<version>2.13.2</version>
 		</dependency>
-		<dependency>
-			<groupId>nz.co.lolnet.james137137</groupId>
-			<artifactId>factionchat</artifactId>
-			<version>1.10.8</version>
-		</dependency>
 	</dependencies>
 	<build>
 		<finalName>${project.name}</finalName>
@@ -67,13 +58,6 @@
 						<goals>
 							<goal>shade</goal>
 						</goals>
-						<configuration>
-							<artifactSet>
-								<excludes>
-									<exclude>nz.co.lolnet.james137137:factionchat</exclude>
-								</excludes>
-							</artifactSet>
-						</configuration>
 					</execution>
 				</executions>
 			</plugin>
