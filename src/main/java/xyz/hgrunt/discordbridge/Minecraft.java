@@ -91,7 +91,7 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 
 		String msg = e.getMessage();
 		Matcher match = emojiPattern.matcher(msg);
-		if (match.find()) {
+		while (match.find()) {
 			List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
 			if (!emotes.isEmpty()) {
 				msg = msg.replace(":" + match.group(1) + ":", emotes.get(0).getAsMention());
