@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,10 +92,12 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 
 		String msg = e.getMessage();
 		Matcher match = emojiPattern.matcher(msg);
+		HashSet<String> foundMatches = new HashSet<String>();
 		while (match.find()) {
 			List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
-			if (!emotes.isEmpty()) {
-				msg = msg.replace(":" + match.group(1) + ":", emotes.get(0).getAsMention());
+			if (!emotes.isEmpty() && !foundMatches.contains(match.group(1))) {
+				foundMatches.add(match.group(1));
+				msg = msg.replaceAll(":(" + match.group(1) + "):", emotes.get(0).getAsMention());
 			}
 		}
 
