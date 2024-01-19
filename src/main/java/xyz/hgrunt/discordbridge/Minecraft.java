@@ -1,10 +1,5 @@
 package xyz.hgrunt.discordbridge;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -12,52 +7,42 @@ import java.util.regex.Pattern;
 
 import javax.security.auth.login.LoginException;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.event.EventHandler;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event.Priority;
+import org.bukkit.event.Event.Type;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerAdvancementDoneEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityListener;
+import org.bukkit.event.player.PlayerChatEvent;
+import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerKickEvent;
+import org.bukkit.event.player.PlayerListener;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.config.Configuration;
 
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Emote;
 import net.dv8tion.jda.api.entities.TextChannel;
-import nz.co.lolnet.james137137.FactionChat.API.FactionChatAPI;
 
-public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
+public class Minecraft extends JavaPlugin implements Listener {
 	private Discord discord = null;
-	FileConfiguration config = getConfig();
-	private HashMap<String, String> lang = new HashMap<String, String>();
+	Configuration config;
 	private TextChannel ch;
 
 	Pattern emojiPattern = Pattern.compile(":(\\w+):");
 
 	@Override
 	public void onEnable() {
-		config.options().copyDefaults(true);
-		saveConfig();
-
-		try {
-			loadAdvancements();
-		} catch (IOException e) {
-			getLogger().severe("Failed to read Minecraft's lang file");
-			e.printStackTrace();
-			getPluginLoader().disablePlugin(this);
-			return;
-		}
-
-		String token = config.getString("token");
+		config = getConfiguration();
+		String token = config.getString("token", "insert-bot-token-here");
+		config.getString("channel", "insert-channel-id-here");
+		config.getString("username-color", "&f");
+		config.getBoolean("use-role-color-as-username-color", false);
+		config.save();
 
 		if (token.equals("insert-bot-token-here")) {
-			getLogger().severe("Please set up your config.");
+			getServer().getLogger().severe("Please set up your config.");
 			getPluginLoader().disablePlugin(this);
 			return;
 		}
@@ -65,13 +50,15 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		try {
 			discord = new Discord(this, token);
 		} catch (LoginException e) {
-			getLogger().severe("Failed to init Discord! Is your token correct?");
+			getServer().getLogger().severe("Failed to init Discord! Is your token correct?");
 			getPluginLoader().disablePlugin(this);
 			return;
 		}
 
-		getServer().getPluginManager().registerEvents(this, this);
-		getCommand("discordbridge").setExecutor(this);
+		getServer().getPluginManager().registerEvent(Type.PLAYER_CHAT, new PlayerEvents(), Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Type.PLAYER_JOIN, new PlayerEvents(), Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Type.PLAYER_QUIT, new PlayerEvents(), Priority.Normal, this);
+		getServer().getPluginManager().registerEvent(Type.ENTITY_DEATH, new EntityEvents(), Priority.Normal, this);
 	}
 
 	@Override
@@ -80,87 +67,64 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 			discord.jda.shutdownNow();
 	}
 
-	@EventHandler
-	public void onPlayerChat(AsyncPlayerChatEvent e) {
-		if (getServer().getPluginManager().getPlugin("FactionChat") != null) {
-			if (FactionChatAPI.isFactionChatMessage(e))
+	public class PlayerEvents extends PlayerListener {
+		@Override
+		public void onPlayerChat(PlayerChatEvent e) {
+			if (!ensureChannel())
 				return;
+
+			String msg = e.getMessage();
+			Matcher match = emojiPattern.matcher(msg);
+			HashSet<String> foundMatches = new HashSet<String>();
+			while (match.find()) {
+				List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
+				if (!emotes.isEmpty() && !foundMatches.contains(match.group(1))) {
+					foundMatches.add(match.group(1));
+					msg = msg.replaceAll(":(" + match.group(1) + "):", emotes.get(0).getAsMention());
+				}
+			}
+
+			ch.sendMessage("**<" + Discord.escapeMarkdown(stripColor(e.getPlayer().getDisplayName())) + ">** " + msg)
+					.queue();
 		}
 
-		if (!ensureChannel())
-			return;
+		@Override
+		public void onPlayerJoin(PlayerEvent e) {
+			if (!ensureChannel())
+				return;
 
-		String msg = e.getMessage();
-		Matcher match = emojiPattern.matcher(msg);
-		HashSet<String> foundMatches = new HashSet<String>();
-		while (match.find()) {
-			List<Emote> emotes = discord.jda.getEmotesByName(match.group(1), true);
-			if (!emotes.isEmpty() && !foundMatches.contains(match.group(1))) {
-				foundMatches.add(match.group(1));
-				msg = msg.replaceAll(":(" + match.group(1) + "):", emotes.get(0).getAsMention());
+			ch.sendMessage(Discord.escapeMarkdown(stripColor(e.getPlayer().getDisplayName()) + " joined the game"))
+					.queue();
+			discord.jda.getPresence().setActivity(Activity.playing(
+					getServer().getOnlinePlayers().length + "/" + getServer().getMaxPlayers() + " players online"));
+		}
+
+		@Override
+		public void onPlayerQuit(PlayerEvent e) {
+			if (!ensureChannel())
+				return;
+
+			ch.sendMessage(Discord.escapeMarkdown(stripColor(e.getPlayer().getDisplayName()) + " left the game"))
+					.queue();
+			discord.jda.getPresence().setActivity(Activity.playing(
+					getServer().getOnlinePlayers().length + "/" + getServer().getMaxPlayers() + " players online"));
+		}
+	}
+
+	public class EntityEvents extends EntityListener {
+
+		@Override
+		public void onEntityDeath(EntityDeathEvent e) {
+			if (e.getEntity() instanceof Player) {
+				if (!ensureChannel())
+					return;
+
+				Player p = (Player) e.getEntity();
+
+				getServer().broadcastMessage(p.getDisplayName() + " died");
+				ch.sendMessage(Discord.escapeMarkdown(stripColor(p.getDisplayName()) + " died")).queue();
 			}
 		}
-
-		ch.sendMessage("**<" + Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getDisplayName())) + ">** " + msg).queue();
-	}
-
-	@EventHandler
-	public void onPlayerJoin(PlayerJoinEvent e) {
-		if (!ensureChannel())
-			return;
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getJoinMessage()))).queue();
-		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() + "/" + getServer().getMaxPlayers() + " players online"));
-	}
-
-	@EventHandler
-	public void onPlayerLeave(PlayerQuitEvent e) {
-		if (!ensureChannel())
-			return;
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getQuitMessage()))).queue();
-		discord.jda.getPresence().setActivity(Activity.playing(
-				getServer().getOnlinePlayers().size() - 1 + "/" + getServer().getMaxPlayers() + " players online"));
-	}
-
-	@EventHandler
-	public void onPlayerDeath(PlayerDeathEvent e) {
-		if (!ensureChannel())
-			return;
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getDeathMessage()))).queue();
-	}
-
-	@EventHandler
-	public void onPlayerAdvancement(PlayerAdvancementDoneEvent e) {
-		if (!ensureChannel())
-			return;
-
-		if (e.getAdvancement().getKey().getKey().startsWith("recipes/")
-				|| e.getAdvancement().getKey().getKey().endsWith("/root"))
-			return;
-
-		ch.sendMessage(Discord.escapeMarkdown(ChatColor.stripColor(e.getPlayer().getName())) + " has made the advancement **"
-				+ lang.get(e.getAdvancement().getKey().getKey()) + "**").queue();
-	}
-
-	@Override
-	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-		reloadConfig();
-		config = getConfig();
-
-		if (discord != null && discord.jda != null)
-			discord.jda.shutdownNow();
-
-		try {
-			discord = new Discord(this, config.getString("token"));
-		} catch (LoginException e) {
-			getLogger().severe("Failed to init Discord! Is your token correct?");
-			getPluginLoader().disablePlugin(this);
-		}
-
-		getLogger().info("Reloaded.");
-		sender.sendMessage("Reloaded.");
-
-		return true;
 	}
 
 	private boolean ensureChannel() {
@@ -170,39 +134,27 @@ public class Minecraft extends JavaPlugin implements Listener, CommandExecutor {
 		}
 
 		if (ch == null) {
-			getLogger().severe("Couldn't find the channel!");
+			getServer().getLogger().severe("Couldn't find the channel!");
 			return false;
 		}
 
 		if (!ch.canTalk()) {
-			getLogger().severe("I don't have permission to talk in #" + ch.getName() + "!");
+			getServer().getLogger().severe("I don't have permission to talk in #" + ch.getName() + "!");
 			return false;
 		}
 
 		return true;
 	}
 
-	private void loadAdvancements() throws IOException {
-		InputStream is = Bukkit.class.getClassLoader().getResourceAsStream("assets/minecraft/lang/en_us.lang");
-		BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+	public static final char COLOR_CHAR = '\u00A7';
+	private static final Pattern STRIP_COLOR_PATTERN = Pattern
+			.compile("(?i)" + String.valueOf(COLOR_CHAR) + "[0-9A-FK-OR]");
 
-		String line;
-		while ((line = reader.readLine()) != null) {
-			if (!line.startsWith("advancements.") || !line.contains(".title="))
-				continue;
-
-			if (line.contains("root.title="))
-				continue;
-
-			String key = line.split("=")[0].replace("advancements.", "").replace(".title", "").replace(".", "/");
-			String value = line.split("=")[1];
-
-			if (key.equals("husbandry/breed_all_animals"))
-				key = "husbandry/bred_all_animals"; // why
-			lang.put(key, value);
+	public static String stripColor(final String input) {
+		if (input == null) {
+			return null;
 		}
 
-		reader.close();
-		is.close();
+		return STRIP_COLOR_PATTERN.matcher(input).replaceAll("");
 	}
 }
